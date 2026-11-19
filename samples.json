@@ -1,0 +1,6 @@
+{
+  "shift": {"records": [3, -8, 3], "count": 3, "peak": 8},
+  "empty": {"records": [], "count": 0, "peak": null},
+  "repeat": {"records": [3, -8], "count": 2, "peak": 8},
+  "unrelated": {"records": [0, -5], "count": 2, "peak": 5}
+}
