@@ -53,5 +53,13 @@ def initialize_catalog(path: str | Path) -> Catalog:
         connection.execute('''
             CREATE INDEX IF NOT EXISTS volumes_object ON volumes(object_name)
         ''')
+        connection.execute('''
+            CREATE TABLE IF NOT EXISTS threshold_anchors (
+                volume_id TEXT PRIMARY KEY NOT NULL REFERENCES volumes(volume_id),
+                commitment_version INTEGER NOT NULL
+                    CHECK (commitment_version > 0),
+                root_digest TEXT NOT NULL
+            )
+        ''')
         initialize_retirement_tables(connection)
     return catalog

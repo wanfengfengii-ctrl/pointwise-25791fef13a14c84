@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import sys
 import unittest
@@ -144,9 +145,17 @@ def demonstrate():
         store = initialize_object_store(store_path)
         volume = require_receipt(submit(catalog, store, "A", RECORDS)).volume_id
         anchor = issue_threshold_anchor(catalog, store, volume)
+        # Reopen both archives before collecting the package, as an external
+        # shift would when resuming work from the persisted database files.
         catalog = initialize_catalog(catalog_path)
         store = initialize_object_store(store_path)
         package = export_threshold(catalog, store, volume, 8)
+        retired_export = None
+        try:
+            retire_volume(catalog, volume)
+            export_threshold(catalog, store, volume, 8)
+        except RetiredVolumeError:
+            retired_export = "rejected"
     actual = verify_threshold(anchor, volume, 8, package)
     try:
         verify_threshold(anchor, volume, 8, dict(package, hits=((3, 8),)))
@@ -154,9 +163,21 @@ def demonstrate():
         verdict = "rejected"
     else:
         verdict = "accepted"
+    # Block every database connection to prove verification needs no portal,
+    # source database or issuing process; the delivered package still verifies.
+    with patch.object(sqlite3, "connect", side_effect=AssertionError("offline database access")):
+        offline = verify_threshold(anchor, volume, 8, package)
+    assert offline == actual and retired_export == "rejected"
     emit("threshold-offline", RECORDS, expected(volume, 8, HITS, 4, 8), actual,
-         "rejected", verdict, ["publish/receipts.py", "review/result.py"],
+         "rejected", verdict, ["publish/receipts.py", "review/result.py", "review/commitment.py"],
          "Positions 1 and 3 have absolute value 8. Dropping position 1 leaves the count and peak unchanged.")
+    print("POINTWISE_SCENARIO " + json.dumps({
+        "case_id": "threshold-handoff",
+        "reopen_export": "ok",
+        "offline_verify_with_sqlite_blocked": "ok",
+        "retired_new_export": retired_export,
+        "retired_package_still_verifies": "ok",
+    }, ensure_ascii=False, sort_keys=True))
 
 
 def run_cases(case_type):
